@@ -59,7 +59,7 @@ app.get("/players/:playerId/", async (request, response) => {
 });
 app.put("/players/:playerId/", async (request, response) => {
   const { playerId } = request.params;
-  const { player_name } = request.body;
+  const { playerName } = request.body;
   const putPlayerQuery = `
     UPDATE player_details
     SET 
@@ -116,8 +116,8 @@ app.get("/matches/:matchId/players", async (request, response) => {
         T.player_id as player_id,
         player_name
     FROM 
-        (player_details 
-        INNER JOIN player_match_score
+        (player_match_score
+        INNER JOIN player_details
         ON player_details.player_id=player_match_score.player_id) as T
     WHERE 
         T.match_id=${matchId};`;

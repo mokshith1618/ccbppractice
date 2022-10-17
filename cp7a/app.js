@@ -124,7 +124,7 @@ app.get("/matches/:matchId/players", async (request, response) => {
   response.send(
     matches.map((item) => {
       return {
-        playerID: item.player_id,
+        playerId: item.player_id,
         playerName: item.player_name,
       };
     })

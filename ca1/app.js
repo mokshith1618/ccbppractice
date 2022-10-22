@@ -1,0 +1,131 @@
+const express = require("express");
+const path = require("path");
+const sqlite3 = require("sqlite3");
+const { open } = require("sqlite");
+const format = require("date-fns/format");
+const isValid = require("date-fns/isValid");
+const app = express();
+app.use(express.json());
+const dbPath = path.join(__dirname, "todoApplication.db");
+let db = null;
+const initializeDBAndServer = async () => {
+  try {
+    db = await open({
+      filename: dbPath,
+      driver: sqlite3.Database,
+    });
+    app.listen(3000, () => {
+      console.log("Server running on http://localhost:3000/");
+    });
+  } catch (e) {
+    console.log(`DB error: ${e.message}`);
+    process.exit(1);
+  }
+};
+initializeDBAndServer();
+const invalidityConditions = (status, priority, category, dueDate, date) => {
+  if (!["HIGH", "MEDIUM", "", "LOW"].includes(priority)) {
+    return "Invalid Todo Priority";
+  } else if (!["TO DO", "IN PROGRESS", "", "DONE"].includes(status)) {
+    return "Invalid Todo Status";
+  } else if (!["WORK", "HOME", "", "LEARNING"].includes(category)) {
+    return "Invalid Todo category";
+  } else if (!isValid(new Date(dueDate)) && !dueDate == "") {
+    return "Invalid Due Date";
+  } else if (!isValid(new Date(date)) && !date == "") {
+    return "Invalid Due Date";
+  }
+  return "valid";
+};
+const formattedTodosList = (todo) => {
+  return {
+    id: todo.id,
+    todo: todo.todo,
+    priority: todo.priority,
+    status: todo.status,
+    category: todo.category,
+    dueDate: todo.due_date,
+  };
+};
+const checkValidity = (request, response, next) => {
+  let res = 0;
+  for (let obj of [request.body, request.query]) {
+    let {
+      category = "",
+      status = "",
+      dueDate = "",
+      priority = "",
+      date = "",
+    } = obj;
+    const validity = invalidityConditions(
+      status,
+      priority,
+      category,
+      dueDate,
+      date
+    );
+    if (validity !== "valid") {
+      response.status(400);
+      response.send(validity);
+      res = 1;
+      break;
+    }
+  }
+  if (res === 0) {
+    next();
+  }
+};
+app.get("/todos/", checkValidity, async (request, response) => {
+  const {
+    search_q = "",
+    category = "",
+    status = "",
+    priority = "",
+  } = request.query;
+  const formattedDueDate = "";
+  if (dueDate !== "") {
+    formattedDueDate = format(new Date(dueDate), "yyyy-MM-dd");
+  }
+  const getTodosQuery = `
+    SELECT 
+        *
+    FROM 
+        todo
+    WHERE 
+        todo LIKE '%${search_q}%' and
+        category LIKE '%${category}%' and
+        status LIKE '%${status}%' and
+        priority LIKE '%${priority}%';`;
+  const todos = await db.all(getTodosQuery);
+  response.send(todos.map((item) => formattedTodosList(item)));
+});
+app.get("/todos/:todoId/", checkValidity, async (request, response) => {
+  const { todoId } = request.params;
+  const getTodoQuery = `
+    SELECT 
+        *
+    FROM 
+        todo
+    WHERE 
+        id=${todoId};`;
+  const todo = await db.get(getTodoQuery);
+  response.send(formattedTodosList(todo));
+});
+app.get("/agenda/", checkValidity, async (request, response) => {
+  const { date = "" } = request.query;
+  let formattedDueDate = "";
+  if (date !== "") {
+    formattedDueDate = format(new Date(date), "yyyy-MM-dd");
+  }
+  const getTodoQuery = `
+    SELECT 
+        *
+    FROM 
+        todo
+    WHERE 
+        due_date = strftime("%Y-%m-%d",'${formattedDueDate}');`;
+  const todo = await db.get(getTodoQuery);
+  console.log(formattedDueDate);
+  response.send(todo);
+});
+module.exports = app;
